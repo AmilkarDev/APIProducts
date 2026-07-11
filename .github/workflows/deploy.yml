@@ -1,6 +1,7 @@
 name: Deploy .NET 8 API to Azure
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
