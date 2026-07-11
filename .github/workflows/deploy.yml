@@ -3,7 +3,7 @@ name: Deploy .NET 8 API to Azure
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build-and-deploy:
@@ -20,7 +20,7 @@ jobs:
 
       - name: Build and Publish
         run: |
-          cd webApiLearnClientA.Api
+          cd webApiLearn/ClientA.Api
           dotnet publish -c Release -o ../publish
 
       - name: Deploy to Azure Web App
