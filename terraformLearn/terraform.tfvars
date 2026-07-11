@@ -1,0 +1,1 @@
+resource_group_name = "rg-client-a-dev"
