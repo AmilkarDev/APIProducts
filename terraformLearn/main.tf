@@ -64,6 +64,15 @@ resource "azurerm_linux_web_app" "web_app" {
   location                  = azurerm_resource_group.rg.location
   service_plan_id           = azurerm_service_plan.app_plan.id
   virtual_network_subnet_id = module.network_stack.subnet_id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  app_settings = {
+    "ConnectionStrings__DefaultConnection" = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
+  }
+
   site_config {
     application_stack {
       dotnet_version = "8.0"
@@ -117,4 +126,3 @@ module "network_stack" {
   vnet_name   = "vnet-client-a-prod"
   subnet_name = "snet-backend-prod"
 }
-

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # 1. The SQL Server Database
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=SuperSecretPassw0rd!
+    ports:
+      - "1433:1433"
+
+  # 2. Your .NET API
+  api:
+    build: 
+      context: ./webApiLearn/ClientA.Api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # This overrides your appsettings.json! It points to the 'db' container.
+      - ConnectionStrings__DefaultConnection=Server=db,1433;Database=ClientADb;User Id=sa;Password=SuperSecretPassw0rd!;TrustServerCertificate=True;
+    depends_on:
+      - db

@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+namespace ClientA.Api;
+
 public class Product
 {
     [Key]
