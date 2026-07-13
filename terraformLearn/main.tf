@@ -50,6 +50,21 @@ resource "azurerm_resource_group" "rg" {
   # }
 }
 
+resource "azurerm_log_analytics_workspace" "law" {
+  name                = "law-client-a-prod-${random_string.suffix.result}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "PerGB2018"
+}
+
+resource "azurerm_application_insights" "app_insights" {
+  name                = "appi-client-a-prod-${random_string.suffix.result}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  application_type    = "web"
+  workspace_id        = azurerm_log_analytics_workspace.law.id
+}
+
 resource "azurerm_service_plan" "app_plan" {
   name                = "app-plan-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.rg.name
@@ -70,7 +85,8 @@ resource "azurerm_linux_web_app" "web_app" {
   }
 
   app_settings = {
-    "ConnectionStrings__DefaultConnection" = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
+    "ConnectionStrings__DefaultConnection"  = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
+    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.app_insights.connection_string
   }
 
   site_config {
