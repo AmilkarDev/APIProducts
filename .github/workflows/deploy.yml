@@ -18,13 +18,24 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-          
+
 # --- NEW STEP: The Quality Gate ---
       - name: Run Unit Tests
         run: |
           cd webApiLearn
           dotnet test
       # ----------------------------------
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=AmilkarDev_APIProducts
+            -Dsonar.organization=amilkardev
+            -Dsonar.sources=webApiLearn/ClientA.Api
 
       - name: Build and Publish
         run: |

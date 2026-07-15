@@ -8,3 +8,4 @@ appsettings.Development.json
 *.tfstate
 *.tfstate.backup
 .terraform.tfstate.lock.info
+.env

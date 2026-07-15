@@ -31,11 +31,11 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
-resource "random_password" "sql_password" {
-  length           = 16
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
-}
+# resource "random_password" "sql_password" {
+#   length           = 16
+#   special          = true
+#   override_special = "!#$%&*()-_=+[]{}<>:?"
+# }
 
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
@@ -85,7 +85,10 @@ resource "azurerm_linux_web_app" "web_app" {
   }
 
   app_settings = {
-    "ConnectionStrings__DefaultConnection"  = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
+      # Instead of the secret, we just tell the app where the Vault is!
+    "KeyVaultUri" = azurerm_key_vault.vault.vault_uri
+    # Use "Active Directory Default" for passwordless auth
+    "ConnectionStrings__DefaultConnection" = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.app_insights.connection_string
   }
 
@@ -103,12 +106,19 @@ resource "azurerm_mssql_server" "sql_server" {
   location                     = azurerm_resource_group.rg.location
   version                      = "12.0"
   administrator_login          = "sqladmin"
-  administrator_login_password = random_password.sql_password.result
+  # administrator_login_password = random_password.sql_password.result
 
   azuread_administrator {
     login_username = "melek.ferhi@gmail.com"
     object_id      = data.azurerm_client_config.current.object_id
     tenant_id      = data.azurerm_client_config.current.tenant_id
+
+    # THIS IS THE KEY: It removes the password requirement
+    azuread_authentication_only = true
+  }
+
+  lifecycle {
+  ignore_changes = [administrator_login_password]
   }
 }
 
@@ -141,4 +151,32 @@ module "network_stack" {
   location    = azurerm_resource_group.rg.location
   vnet_name   = "vnet-client-a-prod"
   subnet_name = "snet-backend-prod"
+}
+
+
+# 2. Create the Vault
+resource "azurerm_key_vault" "vault" {
+  name                = "kv-client-a-${random_string.suffix.result}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+}
+
+# Grant YOURSELF access to manage secrets
+resource "azurerm_key_vault_access_policy" "your_user_access" {
+  key_vault_id = azurerm_key_vault.vault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = data.azurerm_client_config.current.object_id # This is your user ID
+
+  secret_permissions = ["Get", "List", "Set", "Delete", "Recover", "Backup", "Restore", "Purge"]
+}
+
+# 3. Grant the Web App access to read secrets
+resource "azurerm_key_vault_access_policy" "web_app_access" {
+  key_vault_id = azurerm_key_vault.vault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.web_app.identity[0].principal_id
+
+  secret_permissions = ["Get", "List"]
 }

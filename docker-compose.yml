@@ -6,10 +6,17 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=SuperSecretPassw0rd!
+      - MSSQL_SA_PASSWORD=${DB_PASSWORD}
     ports:
       - "1433:1433"
 
+  seq:
+    image: datalust/seq:latest
+    environment:
+    - ACCEPT_EULA=Y
+    - SEQ_FIRSTRUN_ADMINPASSWORD=${SEQ_PASSWORD}
+    ports:
+    - "5341:80"
   # 2. Your .NET API
   api:
     build: 
@@ -20,6 +27,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       # This overrides your appsettings.json! It points to the 'db' container.
-      - ConnectionStrings__DefaultConnection=Server=db,1433;Database=ClientADb;User Id=sa;Password=SuperSecretPassw0rd!;TrustServerCertificate=True;
+      - ConnectionStrings__DefaultConnection=Server=db,1433;Database=ClientADb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True;
+      # Tell the .NET app where to send local logs
+      - Seq__ServerUrl=http://seq
     depends_on:
       - db
