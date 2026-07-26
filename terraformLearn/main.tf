@@ -10,12 +10,9 @@ terraform {
     }
   }
 
-  backend "azurerm" {
-    resource_group_name  = "rg-terraform-meta"
-    storage_account_name = "amallokstorage" # Must match your step 1 name
-    container_name       = "tfstate"
-    key                  = "client-a-dev.terraform.tfstate" # The name of the blob file in Azure
-  }
+# PARTIAL CONFIGURATION: Empty block. We inject variables dynamically.
+  backend "azurerm" {}
+
 
 }
 
@@ -51,14 +48,14 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_log_analytics_workspace" "law" {
-  name                = "law-client-a-prod-${random_string.suffix.result}"
+  name                = "app-analytics-client-a-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   sku                 = "PerGB2018"
 }
 
 resource "azurerm_application_insights" "app_insights" {
-  name                = "appi-client-a-prod-${random_string.suffix.result}"
+  name                = "app_insights-client-a-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   application_type    = "web"
@@ -66,7 +63,7 @@ resource "azurerm_application_insights" "app_insights" {
 }
 
 resource "azurerm_service_plan" "app_plan" {
-  name                = "app-plan-${random_string.suffix.result}"
+  name                = "app-plan-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   os_type             = "Linux"
@@ -74,7 +71,7 @@ resource "azurerm_service_plan" "app_plan" {
 }
 
 resource "azurerm_linux_web_app" "web_app" {
-  name                      = "app-client-a-dotnet-api-${random_string.suffix.result}"
+  name                      = "app-client-a-dotnet-api-${var.environment}"
   resource_group_name       = azurerm_resource_group.rg.name
   location                  = azurerm_resource_group.rg.location
   service_plan_id           = azurerm_service_plan.app_plan.id
@@ -101,7 +98,7 @@ resource "azurerm_linux_web_app" "web_app" {
 
 
 resource "azurerm_mssql_server" "sql_server" {
-  name                         = "sql-client-a-prod-${random_string.suffix.result}"
+  name                         = "sqlserver-client-a-${var.environment}"
   resource_group_name          = azurerm_resource_group.rg.name
   location                     = azurerm_resource_group.rg.location
   version                      = "12.0"
@@ -123,13 +120,13 @@ resource "azurerm_mssql_server" "sql_server" {
 }
 
 resource "azurerm_mssql_database" "sql_db" {
-  name      = "sqldb-client-a-prod"
+  name      = "sqldb-client-a-${var.environment}"
   server_id = azurerm_mssql_server.sql_server.id
   sku_name  = "Basic" # Keeping costs low for this tutorial!
 }
 
 resource "azurerm_mssql_firewall_rule" "local_access" {
-  name             = "Local-Dev-Access"
+  name             = "Local-Access-${var.environment}"
   server_id        = azurerm_mssql_server.sql_server.id
   start_ip_address = "176.128.237.100"
   end_ip_address   = "176.128.237.100"
@@ -137,7 +134,7 @@ resource "azurerm_mssql_firewall_rule" "local_access" {
 
 
 resource "azurerm_mssql_virtual_network_rule" "sql_vnet_rule" {
-  name      = "sql-vnet-rule"
+  name      = "sql-vnet-rule-${var.environment}"
   server_id = azurerm_mssql_server.sql_server.id
   subnet_id = module.network_stack.subnet_id
 }
@@ -149,8 +146,8 @@ module "network_stack" {
   # Injection des dépendances et variables
   rg_name     = azurerm_resource_group.rg.name
   location    = azurerm_resource_group.rg.location
-  vnet_name   = "vnet-client-a-prod"
-  subnet_name = "snet-backend-prod"
+  vnet_name   = "vnet-client-a-${var.environment}"
+  subnet_name = "snet-backend-${var.environment}"
 }
 
 
@@ -161,6 +158,10 @@ resource "azurerm_key_vault" "vault" {
   resource_group_name = azurerm_resource_group.rg.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Grant YOURSELF access to manage secrets
