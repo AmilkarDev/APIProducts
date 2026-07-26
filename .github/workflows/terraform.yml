@@ -4,15 +4,24 @@ on:
   push:
     branches:
       - master
+      - Dev
   pull_request:
     branches:
       - master
+      - Dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ (github.base_ref || github.ref_name) == 'master' && 'prod' || 'dev' }}
+  cancel-in-progress: false
 
 jobs:
   terraform:
-    name: Terraform
+    name: Terraform (${{ (github.base_ref || github.ref_name) == 'master' && 'prod' || 'dev' }})
     runs-on: ubuntu-latest
-    environment: azureENV
+    environment: ${{ (github.base_ref || github.ref_name) == 'master' && 'Production' || 'Development' }}
 
     defaults:
       run:
@@ -23,21 +32,40 @@ jobs:
       ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      TF_IN_AUTOMATION: true
+      TF_INPUT: false
 
     steps:
-      - name: Checkout
+      - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
 
-      - name: Terraform Init
-        run: terraform init
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
 
-      - name: Terraform Plan
-        if: github.event_name == 'pull_request'
-        run: terraform plan -no-color
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=rg-terraform-meta" \
+            -backend-config="storage_account_name=amallokstorage" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=client-a-${{ (github.base_ref || github.ref_name) == 'master' && 'prod' || 'dev' }}.terraform.tfstate"
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-        run: terraform apply -auto-approve
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: |
+          terraform plan \
+            -no-color \
+            -var-file="${{ (github.base_ref || github.ref_name) == 'master' && 'prod' || 'dev' }}.tfvars" \
+            -out=tfplan
+
+      - name: Terraform apply
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        run: terraform apply -auto-approve tfplan
