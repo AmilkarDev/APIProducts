@@ -51,7 +51,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="resource_group_name=rg-terraform-meta" \
-            -backend-config="storage_account_name=sttfstatecolombiancoffee" \
+            -backend-config="storage_account_name=amallokstorage" \
             -backend-config="container_name=tfstate" \
             -backend-config="key=client-a-${{ (github.base_ref || github.ref_name) == 'master' && 'prod' || 'dev' }}.terraform.tfstate"
 
