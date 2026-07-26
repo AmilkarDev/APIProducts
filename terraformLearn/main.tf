@@ -10,7 +10,7 @@ terraform {
     }
   }
 
-# PARTIAL CONFIGURATION: Empty block. We inject variables dynamically.
+  # PARTIAL CONFIGURATION: Empty block. We inject variables dynamically.
   backend "azurerm" {}
 
 
@@ -82,10 +82,10 @@ resource "azurerm_linux_web_app" "web_app" {
   }
 
   app_settings = {
-      # Instead of the secret, we just tell the app where the Vault is!
+    # Instead of the secret, we just tell the app where the Vault is!
     "KeyVaultUri" = azurerm_key_vault.vault.vault_uri
     # Use "Active Directory Default" for passwordless auth
-    "ConnectionStrings__DefaultConnection" = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
+    "ConnectionStrings__DefaultConnection"  = "Server=tcp:${azurerm_mssql_server.sql_server.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sql_db.name};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.app_insights.connection_string
   }
 
@@ -98,11 +98,11 @@ resource "azurerm_linux_web_app" "web_app" {
 
 
 resource "azurerm_mssql_server" "sql_server" {
-  name                         = "sqlserver-client-a-${var.environment}"
-  resource_group_name          = azurerm_resource_group.rg.name
-  location                     = azurerm_resource_group.rg.location
-  version                      = "12.0"
-  administrator_login          = "sqladmin"
+  name                = "sqlserver-client-a-${var.environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  version             = "12.0"
+  administrator_login = "sqladmin"
   # administrator_login_password = random_password.sql_password.result
 
   azuread_administrator {
@@ -115,7 +115,7 @@ resource "azurerm_mssql_server" "sql_server" {
   }
 
   lifecycle {
-  ignore_changes = [administrator_login_password]
+    ignore_changes = [administrator_login_password]
   }
 }
 

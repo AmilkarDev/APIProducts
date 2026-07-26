@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - master
-      - dev
+      - Dev
   pull_request:
     branches:
       - master
-      - dev
+      - Dev
 
 permissions:
   contents: read
@@ -66,5 +66,5 @@ jobs:
             -out=tfplan
 
       - name: Terraform apply
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
         run: terraform apply -auto-approve tfplan
