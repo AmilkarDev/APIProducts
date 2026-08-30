@@ -9,3 +9,7 @@ appsettings.Development.json
 *.tfstate.backup
 .terraform.tfstate.lock.info
 .env
+
+# Azure publish profiles contain deployment credentials
+*.PublishSettings
+*.publishsettings
