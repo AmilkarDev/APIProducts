@@ -5,10 +5,24 @@ on:
   push:
     branches:
       - master
+      - Dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-deploy-${{ github.ref_name == 'master' && 'prod' || 'dev' }}
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
+    name: Build and deploy (${{ github.ref_name == 'master' && 'prod' || 'dev' }})
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev'
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'master' && 'Production' || 'Development' }}
+
+    env:
+      AZURE_WEBAPP_NAME: ${{ github.ref_name == 'master' && 'app-client-a-dotnet-api-prod' || 'app-client-a-dotnet-api-dev' }}
 
     steps:
       - name: Download Source Code
@@ -19,12 +33,10 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-# --- NEW STEP: The Quality Gate ---
       - name: Run Unit Tests
         run: |
           cd webApiLearn
           dotnet test
-      # ----------------------------------
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
@@ -45,6 +57,6 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'app-client-a-dotnet-api-6cdc0q'
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: './webApiLearn/publish'
