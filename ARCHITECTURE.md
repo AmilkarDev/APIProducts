@@ -22,8 +22,8 @@ flowchart TB
     User[API client] -->|HTTPS| WebApp[Azure Linux Web App<br/>.NET 8 Minimal API]
 
     subgraph Environment[Azure environment: Dev or Prod]
-        WebApp -->|VNet integration| Subnet[Delegated subnet<br/>10.0.1.0/24]
-        Subnet --- VNet[Virtual network<br/>10.0.0.0/16]
+        WebApp -->|VNet integration| Subnet[Environment-specific delegated subnet]
+        Subnet --- VNet[Environment-specific virtual network]
         Subnet -->|Microsoft.Sql service endpoint| SQL[Azure SQL logical server]
         SQL --> DB[Azure SQL Database]
 
@@ -99,9 +99,9 @@ The Web App has:
 The reusable `terraformLearn/modules/azure_network` module creates:
 
 - VNet: `vnet-client-a-{environment}`
-- Address space: `10.0.0.0/16`
+- Address space: `10.10.0.0/16` in Development and `10.20.0.0/16` in Production
 - Subnet: `snet-backend-{environment}`
-- Subnet range: `10.0.1.0/24`
+- Subnet range: `10.10.1.0/24` in Development and `10.20.1.0/24` in Production
 
 The subnet is delegated to `Microsoft.Web/serverFarms` for App Service VNet integration and has a `Microsoft.Sql` service endpoint.
 
@@ -357,10 +357,7 @@ The backend storage account is intentionally separate from the workload and is n
 5. **Network access remains partly public.**
    The SQL service endpoint and VNet rule restrict one path, but the SQL server and Key Vault still have public network access enabled. Private endpoints would provide stronger isolation.
 
-6. **Subnet address ranges are identical across environments.**
-   This is acceptable while VNets remain isolated, but distinct ranges are preferable if Dev and Prod networks may later be peered.
-
-7. **Production should use stronger safeguards.**
+6. **Production should use stronger safeguards.**
     Consider GitHub Environment approval rules, Terraform plan approval, resource locks, diagnostic settings, backup/retention review, and a higher SQL/App Service SKU based on availability requirements.
 
 ## 12. Important repository files
