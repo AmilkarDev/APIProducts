@@ -12,3 +12,13 @@ variable "environment" {
   type        = string
   description = "The target environment (e.g., dev, prod, staging)"
 }
+
+variable "vnet_address_space" {
+  description = "The address space assigned to the environment virtual network"
+  type        = list(string)
+}
+
+variable "subnet_address_prefixes" {
+  description = "The address prefixes assigned to the backend subnet"
+  type        = list(string)
+}
