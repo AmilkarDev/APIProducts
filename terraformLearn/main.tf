@@ -141,7 +141,7 @@ module "network_stack" {
   rg_name                 = azurerm_resource_group.rg.name
   location                = azurerm_resource_group.rg.location
   vnet_name               = "vnet-client-a-${var.environment}"
-  subnet_name             = "snet-backend-${var.environment}"
+  subnet_name             = "snet-backend-v2-${var.environment}"
   vnet_address_space      = var.vnet_address_space
   subnet_address_prefixes = var.subnet_address_prefixes
 }
