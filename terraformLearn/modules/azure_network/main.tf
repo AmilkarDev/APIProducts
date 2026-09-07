@@ -12,6 +12,10 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = var.subnet_address_prefixes
   service_endpoints    = ["Microsoft.Sql"]
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   delegation {
     name = "appservice-delegation"
 
