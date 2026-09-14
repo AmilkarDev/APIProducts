@@ -2,7 +2,11 @@ name: Deploy .NET 8 API to Azure
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - Terraform CI/CD
+    types:
+      - completed
     branches:
       - master
       - Dev
@@ -12,22 +16,24 @@ permissions:
   id-token: write
 
 concurrency:
-  group: api-deploy-${{ github.ref_name == 'master' && 'prod' || 'dev' }}
+  group: api-deploy-${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'prod' || 'dev' }}
   cancel-in-progress: false
 
 jobs:
   build-and-deploy:
-    name: Build and deploy (${{ github.ref_name == 'master' && 'prod' || 'dev' }})
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev'
+    name: Build and deploy (${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'prod' || 'dev' }})
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'master' && 'Production' || 'Development' }}
+    environment: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'Production' || 'Development' }}
 
     env:
-      AZURE_WEBAPP_NAME: ${{ github.ref_name == 'master' && 'app-client-a-dotnet-api-prod' || 'app-client-a-dotnet-api-dev' }}
+      AZURE_WEBAPP_NAME: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'app-client-a-dotnet-api-prod' || 'app-client-a-dotnet-api-dev' }}
 
     steps:
       - name: Download Source Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
