@@ -1,0 +1,97 @@
+name: Dev environment - Create or Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Operation to perform on the Dev environment"
+        required: true
+        type: choice
+        options:
+          - create
+          - destroy
+      confirmation:
+        description: "For destroy, enter DESTROY-DEV (leave empty for create)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: ${{ inputs.action == 'destroy' && 'Destroy Dev' || 'Create Dev' }}
+    runs-on: ubuntu-latest
+    environment: Development
+
+    defaults:
+      run:
+        working-directory: terraformLearn
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+    steps:
+      - name: Validate destroy confirmation
+        if: inputs.action == 'destroy'
+        shell: bash
+        env:
+          DESTROY_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [[ "$DESTROY_CONFIRMATION" != "DESTROY-DEV" ]]; then
+            echo "Destroy cancelled: confirmation must be exactly DESTROY-DEV."
+            exit 1
+          fi
+
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init for Dev
+        run: |
+          terraform init -reconfigure \
+            -backend-config="resource_group_name=rg-terraform-meta" \
+            -backend-config="storage_account_name=amallokstorage" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=client-a-dev.terraform.tfstate" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Create plan
+        if: inputs.action == 'create'
+        run: |
+          terraform plan \
+            -no-color \
+            -var-file="dev.tfvars" \
+            -out=tfplan
+
+      - name: Destroy plan
+        if: inputs.action == 'destroy'
+        run: |
+          terraform plan \
+            -destroy \
+            -no-color \
+            -var-file="dev.tfvars" \
+            -out=tfplan
+
+      - name: Apply saved plan
+        run: terraform apply -auto-approve tfplan
