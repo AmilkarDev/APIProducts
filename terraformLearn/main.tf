@@ -104,8 +104,8 @@ resource "azurerm_mssql_server" "sql_server" {
   version             = "12.0"
 
   azuread_administrator {
-    login_username = "melek.ferhi@gmail.com"
-    object_id      = data.azurerm_client_config.current.object_id
+    login_username = var.sql_entra_admin_login
+    object_id      = var.sql_entra_admin_object_id
     tenant_id      = data.azurerm_client_config.current.tenant_id
 
     # THIS IS THE KEY: It removes the password requirement
