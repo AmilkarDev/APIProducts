@@ -22,3 +22,13 @@ variable "subnet_address_prefixes" {
   description = "The address prefixes assigned to the backend subnet"
   type        = list(string)
 }
+
+variable "sql_entra_admin_login" {
+  description = "Display name of the stable Microsoft Entra administrator for Azure SQL"
+  type        = string
+}
+
+variable "sql_entra_admin_object_id" {
+  description = "Object ID of the stable Microsoft Entra administrator for Azure SQL"
+  type        = string
+}

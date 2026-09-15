@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build-and-deploy:
     name: Build and deploy (${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'prod' || 'dev' }})
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     environment: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'Production' || 'Development' }}
 
