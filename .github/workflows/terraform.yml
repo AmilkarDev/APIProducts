@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: terraform-${{ (github.base_ref || github.ref_name) == 'master' && 'prod' || 'dev' }}
@@ -69,3 +70,70 @@ jobs:
       - name: Terraform apply
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
         run: terraform apply -auto-approve tfplan
+
+      - name: Login to Azure with OIDC
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Get GitHub runner public IP
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        id: runner-ip
+        shell: bash
+        run: echo "address=$(curl --fail --silent https://api.ipify.org)" >> "$GITHUB_OUTPUT"
+
+      - name: Temporarily allow GitHub runner on Azure SQL
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        shell: bash
+        run: |
+          az sql server firewall-rule create \
+            --resource-group "rg-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" \
+            --server "sqlserver-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" \
+            --name "github-actions-${{ github.run_id }}" \
+            --start-ip-address "${{ steps.runner-ip.outputs.address }}" \
+            --end-ip-address "${{ steps.runner-ip.outputs.address }}"
+
+      - name: Setup .NET 8
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install database tools
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        shell: pwsh
+        run: |
+          Install-Module SqlServer -Scope CurrentUser -Force -AllowClobber
+          dotnet tool install --global dotnet-ef --version 8.0.27
+
+      - name: Grant the Web App access to Azure SQL
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        shell: pwsh
+        run: |
+          ./scripts/configure-database.ps1 `
+            -ResourceGroup "rg-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" `
+            -SqlServerName "sqlserver-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" `
+            -DatabaseName "sqldb-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" `
+            -WebAppName "app-client-a-dotnet-api-${{ github.ref_name == 'master' && 'prod' || 'dev' }}"
+
+      - name: Apply Entity Framework migrations
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev')
+        shell: bash
+        run: |
+          dotnet ef database update \
+            --project ../webApiLearn/ClientA.Api/ClientA.Api.csproj \
+            --startup-project ../webApiLearn/ClientA.Api/ClientA.Api.csproj \
+            --connection "Server=tcp:sqlserver-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}.database.windows.net,1433;Initial Catalog=sqldb-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }};Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;"
+
+      - name: Remove temporary GitHub runner SQL rule
+        if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/Dev') && steps.runner-ip.outputs.address != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          az sql server firewall-rule delete \
+            --resource-group "rg-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" \
+            --server "sqlserver-client-a-${{ github.ref_name == 'master' && 'prod' || 'dev' }}" \
+            --name "github-actions-${{ github.run_id }}"
