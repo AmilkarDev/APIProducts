@@ -1,0 +1,80 @@
+name: Production environment - Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Enter DESTROY-PROD to confirm permanent destruction"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Destroy Production
+    runs-on: ubuntu-latest
+    environment: Production
+
+    defaults:
+      run:
+        working-directory: terraformLearn
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Validate destruction confirmation
+        shell: bash
+        env:
+          DESTROY_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [[ "$DESTROY_CONFIRMATION" != "DESTROY-PROD" ]]; then
+            echo "Production destruction cancelled: confirmation must be exactly DESTROY-PROD."
+            exit 1
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init for Production
+        run: |
+          terraform init -reconfigure \
+            -backend-config="resource_group_name=rg-terraform-meta" \
+            -backend-config="storage_account_name=amallokstorage" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=client-a-prod.terraform.tfstate" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Create Production destroy plan
+        run: |
+          terraform plan \
+            -destroy \
+            -no-color \
+            -var-file="prod.tfvars" \
+            -out=destroy.tfplan
+
+      - name: Apply Production destroy plan
+        run: terraform apply -auto-approve destroy.tfplan
